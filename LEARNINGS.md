@@ -122,6 +122,26 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 
 ---
 
+### Apprentissage 4 : Extraction iBwave & Identification Type DAS (12 oct 2026)
+
+**Date** : 12 oct 2026  
+**Constat** : Hilda/Yanis ont clarifié workflow extraction données et heuristiques d'identification DAS.
+
+**Points clés** :
+- Fichiers `.ibw` (iBwave natifs) contiennent la surface → à extraire directement
+- Paramètres clés : surface, étages (max ~10), config/étage (open space, dense, etc.), fréquence (basse/haute), MIMO, technos (4G/5G mix)
+- **Type DAS non mentionné dans ELR** → à déduire depuis designs
+  - RosenBerger ou SoliD → Actif OU Hybride
+  - Fibre end-to-end → Actif
+  - Coupleurs/Splitters → Passif OU Hybride
+- **Contrainte opérateurs** : Bouygues Télécom refuse répéteurs/atténuateurs (critère sélection)
+- **Complexité conception** : DAS Passif difficile (équilibrage puissance, pertes coax, position baies selon étage/pièce) ; Actif/Hybride simplifié (fibre)
+- **Procédure extraction surface** : À déterminer (manuel vs auto ?) + valider approche AMina
+
+**Action** : Phase 2 — Parser `.ibw` pour extraction surface + équipementiers + opérateurs ; clarifier procédure extraction
+
+---
+
 ## ❓ Questions Ouvertes
 
 | Question | État | À faire |
