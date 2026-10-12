@@ -68,8 +68,8 @@ Développer un **outil ML prédictif** capable de :
 **Objectif** : Valider que les données nécessaires existent et sont exploitables.
 
 - [ ] Audit des Equipment List Reports (volume, format, structure)
-- [ ] Retours du questionnaire auprès de Hilda, Lucas, Nicolas, etc.
-- [ ] Retours du gars du chiffrage (structure des devis, coûts, facteurs clés)
+- [ ] Retours du questionnaire auprès de Hilda, Yanis et Nicolas.
+- [ ] Retours de Yoann sur le chiffrage (structure des devis, coûts, facteurs clés)
 - [ ] Identification des contraintes et blocages
 - [ ] Validation : données suffisantes ? Qualité OK ?
 
@@ -90,9 +90,9 @@ Développer un **outil ML prédictif** capable de :
 | Rôle | Nom | Email/Equipe |
 |------|-----|--------------|
 | Tuteur académique | Sébastien Peychet | INSA Lyon |
-| Tuteur entreprise | Nicolas Phalippon | Eiffage CARE |
-| Responsable chiffrage | (À identifier) | Eiffage |
-| Collègues CARE | Hilda, Lucas, Nicolas | Eiffage |
+| Tuteur entreprise | Nicolas Phalippon | Eiffage |
+| Responsable chiffrage | Yoann Munier | Eiffage |
+| Collègues CARE | Hilda, Yanis, Nicolas | Eiffage |
 
 ---
 
