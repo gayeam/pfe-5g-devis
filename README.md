@@ -1,6 +1,6 @@
 # PFE : Outil de Devis Prédictif pour Réseaux 5G Privés & DAS
 
-**Période :** Septembre 2026 — Janvier 2027 (S1 INSA Lyon)  
+**Période :** Octobre 2026 — Janvier 2027 (S1 INSA Lyon)  
 **Lieu :** Eiffage Énergie Systèmes, service CARE, Lyon  
 **Tuteur académique :** Sébastien Peychet (INSA Lyon)  
 **Tuteur entreprise :** Nicolas Phalippon (Eiffage)  
