@@ -82,7 +82,7 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 
 ### Apprentissage 1 : Importance de l'État de l'Art
 
-**Date** : 12 oct 2026  
+**Date** : 09 oct 2026  
 **Constat** : Charles a signalé que l'état de l'art manquait au CDC.
 
 **Points clés** :
@@ -96,7 +96,7 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 
 ### Apprentissage 2 : Données Géographiques Existent
 
-**Date** : 12 oct 2026  
+**Date** : 09 oct 2026  
 **Constat** : Olivier a mentionné une **base géographique 3D du gouvernement** (+ précise qu'OSM).
 
 **Points clés** :
@@ -110,7 +110,7 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 
 ### Apprentissage 3 : Cloisonnement = Paramètre Clé
 
-**Date** : 12 oct 2026  
+**Date** : 09 oct 2026  
 **Constat** : Nicolas a insisté sur l'**indice de cloisonnement** comme input.
 
 **Points clés** :
@@ -126,10 +126,10 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 
 | Question | État | À faire |
 |----------|------|---------|
-| Cloisonnement : par niveau ou par bâtiment ? | ⏳ | Poser à Nicolas |
-| Volume de données disponibles ? | ⏳ | Audit dataset |
-| Précision acceptable du devis ? | ⏳ | Poser au gars du chiffrage |
-| Base géographique 3D : comment y accéder ? | ⏳ | Recherche + contacter Olivier |
+| Cloisonnement : par niveau, par section ou par bâtiment ? | ⏳ | Exploiter les données brutes |
+| Volume de données disponibles ? | ⏳ | Audit dataset (en moyenne une cinquantaine par an) |
+| Précision acceptable du devis ? | ⏳ | Poser a Yoann |
+| Base géographique 3D : comment y accéder ? | ⏳ | Recherche sur le net |
 | Constructeur fait partie des inputs ? | ✅ | Oui (Nicolas confirmé) |
 
 ---
@@ -140,15 +140,14 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 |--------|----------|-----------|
 | Surface non apparente | 🔴 Critique | Audit dataset urgent |
 | Données de coûts manquantes | 🔴 Critique | Valider avec le chiffrage |
-| Cloisonnement non documenté dans ELR | 🟠 Haute | Poser au questionnaire |
-| Pas d'accès base géographique 3D | 🟢 Basse | Fallback plans 2D |
+| Cloisonnement non documenté dans ELR | 🟠 Haute | Voir comment exploiter les données brutes |
 
 ---
 
 ## 📚 Références
 
 - **CDC** : Cahier des charges initial (à enrichir avec état de l'art)
-- **Retours** : Charles (mail), Olivier (Teams), Nicolas (Teams)
+- **Retours** : Charles Olivier (Teams), Nicolas (mail)
 - **Questionnaires** : `/docs/Questionnaire_Audit_PFE.docx` + `/docs/Questionnaire_Chiffrage_PFE.docx`
 
 ---
