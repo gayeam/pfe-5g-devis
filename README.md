@@ -29,14 +29,14 @@ Développer un **outil ML prédictif** capable de :
 
 ## 🔄 Contexte & Retours
 
-### Retour de Charles (Eiffage)
+### Retour d'Olivier (Eiffage)
 > Le CDC est clair, mais peut-on être plus **innovant** ?  
 > Idées : import automatique de plans (PDF/DWG) → calcul des superficies et étages  
 > État de l'art manquant au CDC
 
 **Action :** À ajouter au projet dès que possible.
 
-### Retour d'Olivier (Eiffage)
+### Echange avec Olivier
 > Bonne idée d'exploiter les données géographiques.  
 > Piste : base géographique 3D du gouvernement (+ précise qu'OpenStreetMap)  
 > Fallback : plans 2D pour les nouvelles constructions
@@ -63,7 +63,7 @@ Développer un **outil ML prédictif** capable de :
 
 ---
 
-## 🚀 Phase 1 : Audit Dataset (Semaine du 14 oct)
+## 🚀 Phase 1 : Audit Dataset (Semaine du 12 oct)
 
 **Objectif** : Valider que les données nécessaires existent et sont exploitables.
 
@@ -99,8 +99,8 @@ Développer un **outil ML prédictif** capable de :
 ## 📝 Notes
 
 - ⚠️ **Pas de code pour l'instant** — focus sur l'audit dataset
-- 📅 **Validation CDC attendue** : semaine du 14 oct
-- 🎯 **Prochaine étape** : J1 avec le tuteur (18 oct) → cadrage formel
+- 📅 **Validation CDC attendue** : semaine du 12 oct
+- 🎯 **Prochaine étape** : J1 avec le tuteur (16 oct) → cadrage formel
 
 ---
 
