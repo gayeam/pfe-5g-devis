@@ -125,20 +125,43 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 ### Apprentissage 4 : Extraction iBwave & Identification Type DAS (12 oct 2026)
 
 **Date** : 12 oct 2026  
-**Constat** : Hilda/Yanis ont clarifié workflow extraction données et heuristiques d'identification DAS.
+**Constat** : Workflow standardisé + heuristiques d'identification DAS + contraintes opérateurs.
 
 **Points clés** :
-- Fichiers `.ibw` (iBwave natifs) contiennent la surface → à extraire directement
-- Paramètres clés : surface, étages (max ~10), config/étage (open space, dense, etc.), fréquence (basse/haute), MIMO, technos (4G/5G mix)
-- **Type DAS non mentionné dans ELR** → à déduire depuis designs
+
+**Format livrables** :
+- PDF rapport ELR + Excel iBwave (pour faciliter après Yoann)
+- JPEG : plans étages, designs, simulations RSRP
+- Fichiers `.ibw` : iBwave natifs (contiennent la surface)
+
+**Paramètres à extraire/documenter** :
+- Surface : Depuis fichiers `.ibw` (⏳ procédure extraction à déterminer)
+- Étages : Max ~10 étages observés
+- Configurations par étage : Open space, dense, autres variants
+- Fréquence : Basse (portée) vs Haute (débit)
+- MIMO : Activé oui/non
+- Technos : 4G vs 5G (mix possible)
+- Opérateur(s) : Avec contraintes spéciales
+
+**Contraintes opérateurs** :
+- Bouygues Télécom : ❌ Pas de répéteurs / atténuateurs (critère sélection)
+- À documenter pour chaque étude
+
+**Type DAS — Identification** :
+- ELR ne mentionne PAS le type DAS → À déduire des designs
+- Heuristiques :
   - RosenBerger ou SoliD → Actif OU Hybride
   - Fibre end-to-end → Actif
-  - Coupleurs/Splitters → Passif OU Hybride
-- **Contrainte opérateurs** : Bouygues Télécom refuse répéteurs/atténuateurs (critère sélection)
-- **Complexité conception** : DAS Passif difficile (équilibrage puissance, pertes coax, position baies selon étage/pièce) ; Actif/Hybride simplifié (fibre)
-- **Procédure extraction surface** : À déterminer (manuel vs auto ?) + valider approche AMina
+  - Coupleurs / Splitters → Passif OU Hybride
+- Déduction : Lire schémas connecteurs
 
-**Action** : Phase 2 — Parser `.ibw` pour extraction surface + équipementiers + opérateurs ; clarifier procédure extraction
+**Complexité conception par type** :
+- DAS Passif : Difficile (équilibrage puissance, pertes coax, position baies opérateur complexe selon étage/pièce)
+- DAS Actif/Hybride : Simplifié (fibre)
+
+**Action** :
+- Phase 2 : Parser `.ibw` pour surface + équipementiers + opérateurs
+- À clarifier : Extraction surface (manuel vs auto ?) + procédure Amina
 
 ---
 
