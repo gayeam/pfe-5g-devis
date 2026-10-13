@@ -116,7 +116,7 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 **Points clés** :
 - Les matériaux du bâtiment impactent fortement l'atténuation radio
 - Catégories : semi-ouvert, léger, moyen, dense, très dense
-- À spécifier par niveau ? Nicolas dit "à voir"
+- À spécifier par niveau ?
 
 **Action** : À valider lors du questionnaire audit
 
@@ -165,6 +165,43 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 
 ---
 
+### Apprentissage 5 : Contraintes Équipementiers & Topologie Bâtiment (13 oct 2026)
+
+**Date** : 13 oct 2026  
+**Constat** : Yanis a clarifié contraintes équipementiers + impact topologie bâtiment sur dimensionnement.
+
+**Points clés** :
+
+**Contraintes équipementiers** :
+- SoliD : limité en puissance si plusieurs opérateurs, voir techno
+- RosenBerger : typiquement Actif/Hybride, NON accepté par Bouygues Télécom
+- SoliD : souvent retrouvé en Actif/Hybride
+- Bouygues Télécom : accepte Actif mais pas avec des équipements RosenBerger
+- Type DAS restreint choix équipementiers disponibles
+
+**Surface & Topologie : Impact sur Routing Câbles** :
+- **Open space sans étages** : Raccordement horizontal long → pertes coax élevées si DAS passif
+- **Multi-étages** : Possibilité passer câbles verticalement (plafond/toit) → raccordement + court → moins de pertes
+- **Contraintes structure** : Béton (faut contourner) vs béton armé (peut percer) → affecte routing possible
+- **Impact** : Type DAS possible, nb antennes, placement baies, coûts équipements
+- ⏳ À documenter : structure bâtiment (matériaux) + possibilités de routing (vertical vs horizontal)
+
+**Localisation baie opérateur** :
+- Position baie (zone technique) impacte raccordement principal
+- Passage câbles entre étages (ex. via toit en passif) → affecte pertes coax
+- Routing câbles → nb/type antennes à dimensionner
+
+**Type DAS & architecture réseau** :
+- **Passif** : moins de pertes si raccordement coax optimisé (routing toit/étages)
+- **Actif/Hybride** : nécessite "master" de combinaison/relais (équipement spécifique)
+  - SoliD fréquent en Actif/Hybride
+  - Équipements spécifiques selon config
+
+**Action** :
+- Phase 2 : Parser localisation baie + routing câbles depuis designs
+- À documenter : surface en hauteur vs surface en largeur (2 paramètres distincts)
+- Raffiner heuristiques DAS selon contraintes équipementiers + opérateur
+
 ## ❓ Questions Ouvertes
 
 | Question | État | À faire |
@@ -195,7 +232,7 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 
 ---
 
-**Dernière mise à jour** : 12 oct 2026
+**Dernière mise à jour** : 13 oct 2026
 
 ---
 
