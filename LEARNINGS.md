@@ -202,6 +202,46 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 - À documenter : surface en hauteur vs surface en largeur (2 paramètres distincts)
 - Raffiner heuristiques DAS selon contraintes équipementiers + opérateur
 
+---
+
+### Apprentissage 6 : Sources de Données & Contexte Métier (13 oct 2026)
+
+**Date** : 13 oct 2026  
+**Constat** : Nicolas a clarifié sources de données, timeline études, et business model devis.
+
+**Points clés** :
+
+**Dataset & Timeline** :
+- ✅ Exploiter études Indoor après 2023 (Amina a couvert avant)
+- ✅ Sous-traitants peuvent faire études → OK si mêmes livrables format
+- ✅ Docs disponibles SharePoint (Eiffage)
+
+**APS (Avant Projet Sommaire)** :
+- Particularité début 2025 : demandes APS commencent
+- Contenu : résumé conception + études de mesure (si faites) + choix config détaillé
+- Timing : avant signature contrat client (si intéressé)
+
+**Sources Infos Complémentaires** :
+- **Livrables finaux** : complets pour etre livrés, mais certaines infos parfois non renseignées dedans
+  - Solution : retourner sur **tickets clients** pour extraire infos manquantes
+- **Fichiers `.ibwave` natifs** : ouvrir avec logiciel iBwave pour extraire infos (ex. surface si pas renseignée dans extraits)
+- **Excel exemple Nicolas** : référence de structure / où chercher les infos (pas format exact)
+- Infos clés à récupérer : multi-op vs mono-op, bandes fréq, choix tech, surface, etc.
+
+**Business Model Devis** :
+- **Opérateur demande** (ex. Bouygues) : Eiffage devis SANS certains équipements (ex. SoliD)
+- Opérateur fait devis AVEC ces équipements + marge → transfert client
+- **Contact direct client** : réseaux privés non-opérés (hôtels, industrie 5G privée)
+- Devis approximatif par conception
+
+**Action** :
+- ✅ Utiliser devis Eiffage "habituels" comme référence
+- ✅ **À valider avec Yoann** : quelles infos devis sont critiques pour le ML, comment les exploiter
+- ✅ À voir Yoann : comment raffiner chiffrage exact + validation approche
+- ⏳ Retrouver documents Excel exemple (Nicolas) + comprendre structure infos tickets clients
+
+---
+
 ## ❓ Questions Ouvertes
 
 | Question | État | À faire |
