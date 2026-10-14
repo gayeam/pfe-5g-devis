@@ -242,6 +242,21 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 
 ---
 
+### Apprentissage 7 : IGN Data Extractor (14 oct 2026)
+
+**Date** : 14 oct 2026  
+**Constat** : Données publiques IGN exploitables via Overpass API pour extraire surfaces/types/hauteurs.
+
+**Points clés** :
+- BD TOPO : couverture nationale, format vecteur (WFS)
+- LiDAR HD : déploiement national en cours
+- Overpass API : accès facile, pas de clé API requise
+- Fichiers PDF/CAO/DWG : exploitable mais semi-manuel (à voir après)
+
+**Action** : Module Python créé (`src/ign_extractor.py`), à tester sur études réelles
+
+---
+
 ## ❓ Questions Ouvertes
 
 | Question | État | À faire |

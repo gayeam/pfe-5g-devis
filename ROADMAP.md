@@ -38,6 +38,14 @@
 
 **Livrables** : Dataset structuré + data dictionary
 
+### Phase IGN Extraction (14 oct)
+
+- [x] Setup IGN Extractor (Overpass API)
+- [x] Code module + requirements.txt
+- [x] Tests extraction (adresse + coords)
+- [x] Notebook exploration
+- [ ] Intégration données Eiffage (après)
+
 ---
 
 ## Phase 3 : Modèles ML & Backend (16 nov — 11 déc)

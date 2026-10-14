@@ -77,6 +77,22 @@ Développer un **outil ML prédictif** capable de :
 
 ---
 
+## IGN Data Extractor
+
+Extraction automatique des caractéristiques bâtiments depuis données publiques IGN.
+
+### Quick Start
+
+```bash
+python src/ign_extractor.py --address "123 rue de Paris, Lyon"
+```
+
+### Exploration
+
+Voir : [notebooks/01_exploration_ign.ipynb](notebooks/01_exploration_ign.ipynb)
+
+---
+
 ## 📚 Documents & Suivi
 
 - **[ROADMAP.md](./ROADMAP.md)** — Timeline détaillée jusqu'à janvier 2027
