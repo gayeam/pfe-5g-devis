@@ -257,6 +257,38 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 
 ---
 
+### Apprentissage 8 : IGN Data Extractor (15 oct 2026)
+
+## Phase 2 : BD TOPO et LiDAR HD
+
+### Notions
+- **WFS** : service qui renvoie des données vectorielles (ici les contours des bâtiments BD TOPO) en JSON.
+- **WMS** : service qui renvoie une image. Ici, `image/geotiff` permet de récupérer les valeurs de hauteur du MNH pour une emprise donnée.
+- **MNT / MNS / MNH** : modèle de terrain (sol nu), modèle de surface (toits et arbres compris), et modèle de hauteur (MNS − MNT = hauteur au-dessus du sol).
+- **Lambert 93 (EPSG:2154)** : projection en mètres pour la France métropolitaine. On l'utilise pour les surfaces et les distances, à la place du GPS (EPSG:4326).
+- **Pixel LiDAR** : carré de 0,5 m × 0,5 m, soit 0,25 m². Nombre de pixels × 0,25 = surface couverte.
+- **Nodata (-9999)** : valeur conventionnelle des nœuds sans donnée, à ignorer.
+- **Médiane et percentiles** : plus robustes que le max pour résumer une hauteur hétérogène.
+
+### Pièges rencontrés
+- L'ordre des axes compte : bbox en `lon,lat` pour le WFS en EPSG:4326 ; `x,y` (est, nord) pour le WMS en EPSG:2154.
+- Une URL devinée ne fonctionne pas : prendre les URL dans la documentation officielle (descriptif de contenu LiDAR HD).
+- Nominatim prend le premier résultat : vérifier l'adresse trouvée.
+- La surface au sol n'est pas la surface de plancher.
+
+### Ressources
+- Descriptif de contenu LiDAR HD (IGN), section 3 « Modèles numériques » et section 3.3 « Accès aux données ».
+- Service WMS de la Géoplateforme : `https://data.geopf.fr/wms-r/ows?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetCapabilities`
+- Service WFS de la Géoplateforme : `https://data.geopf.fr/wfs/ows`
+- Téléchargement des MNx LiDAR HD : https://cartes.gouv.fr/telechargement/IGNF_MNH-LIDAR-HD
+- Norme WMS (OGC) : https://www.ogc.org/standards/wms/
+- Overpass API (OSM) : https://wiki.openstreetmap.org/wiki/Overpass_API
+- Politique d'usage de Nominatim : https://operations.osmfoundation.org/policies/nominatim/
+- Documentation rasterio : https://rasterio.readthedocs.io
+- Documentation shapely : https://shapely.readthedocs.io
+
+---
+
 ## ❓ Questions Ouvertes
 
 | Question | État | À faire |
@@ -287,7 +319,7 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 
 ---
 
-**Dernière mise à jour** : 13 oct 2026
+**Dernière mise à jour** : 15 oct 2026
 
 ---
 
