@@ -24,7 +24,8 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # Constants
-IGN_WFS_URL = "https://wxs.ign.fr/essentiels/geom/wfs"  # API IGN (open data)
+# IGN_WFS_URL = "https://wxs.ign.fr/essentiels/geom/wfs"  # API IGN (open data)
+# OVERPASS_URL = "https://overpass.kumi.systems/api/interpreter"  # Miroir Overpass
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"  # Fallback OSM
 
 
@@ -80,9 +81,9 @@ class IGNExtractor:
     """Extraction données IGN"""
 
     def __init__(self):
-        self.transformer = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+        self.transformer = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:2154", always_xy=True)
         self.headers = {
-            'User-Agent': 'PFE-5G-Extractor/1.0 (amadoukali.gaye@gmail.com)'
+            'User-Agent': 'PFE-5G-Extractor/1.0'
         }
 
     def extract_from_address(self, address: str) -> Optional[BuildingInfo]:
@@ -180,7 +181,7 @@ class IGNExtractor:
 
             logger.info(f"Requête Overpass: {query}")
         
-            resp = requests.post(OVERPASS_URL, data=query, headers=self.headers, timeout=30)
+            resp = requests.post(OVERPASS_URL, data=query, headers=self.headers, timeout=60)
         
             # Debug : afficher la réponse brute
             logger.info(f"Réponse Overpass (status {resp.status_code}): {resp.text[:200]}")
@@ -289,14 +290,9 @@ class IGNExtractor:
         return mapping.get(osm_type_lower, osm_type_lower)
 
     def _polygon_area_m2(self, polygon) -> float:
-        """Calculer surface polygone en m²"""
+        """Calculer surface polygone en m² (Lambert-93)"""
         from shapely.ops import transform
-        import pyproj
-
-        # Transformer lat/lon → mercator pour calcul distance
-        transformer = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:3857")
-        polygon_m = transform(transformer.transform, polygon)
-
+        polygon_m = transform(self.transformer.transform, polygon)
         return polygon_m.area
 
     def _detect_shape(self, polygon) -> str:
