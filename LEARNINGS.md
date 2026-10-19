@@ -289,6 +289,24 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 
 ---
 
+### Apprentissage 9 : Zones non couvertes et exclusions de périmètre (19 oct 2026)
+
+**Date** : 19 oct 2026  
+**Constat** : Hilda a signalé que la surface brute d'un bâtiment n'est pas toujours la surface à couvrir par le DAS.
+
+**Points clés** :
+- Certaines zones ne sont pas couvertes par conception (ex. navires, locaux avec moteurs ou matériel).
+- Des exclusions volontaires peuvent être faites pour respecter un seuil (ex. ascenseurs, cages).
+- Les espaces creux et la structure de chaque étage influencent le périmètre à couvrir, et varient d'un niveau à l'autre.
+- Des zones peuvent déjà être couvertes par le réseau existant, identifiées après les mesures radio sur site : elles ne sont alors pas prises en compte dans le dimensionnement.
+
+**Action** :
+- Distinguer trois surfaces par étage : surface brute, surface exclue (avec motif), surface à couvrir.
+- Ajouter au modèle de données une liste de zones exclues par étage, avec leur motif.
+- Prévoir la prise en compte des zones déjà couvertes à partir des résultats de mesures radio, quand ils existent.
+
+---
+
 ## ❓ Questions Ouvertes
 
 | Question | État | À faire |
@@ -308,6 +326,7 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 | Surface non apparente | 🔴 Critique | Audit dataset urgent |
 | Données de coûts manquantes | 🔴 Critique | Valider avec le chiffrage |
 | Cloisonnement non documenté dans ELR | 🟠 Haute | Voir comment exploiter les données brutes |
+| Surface brute différente de la surface à couvrir | 🟠 Haute | Modéliser les exclusions par étage |
 
 ---
 
@@ -315,11 +334,11 @@ Ce fichier trace les **décisions clés**, **apprentissages** et **changements**
 
 - **CDC** : Cahier des charges initial (à enrichir avec état de l'art)
 - **Retours** : Charles Olivier (Teams), Nicolas (mail)
-- **Questionnaires** : `/docs/Questionnaire_Audit_PFE.docx` + `/docs/Questionnaire_Chiffrage_PFE.docx`
+- **Etat de l'art** : `/docs/etat_de_lart_chiffrage.md`
 
 ---
 
-**Dernière mise à jour** : 15 oct 2026
+**Dernière mise à jour** : 19 oct 2026
 
 ---
 
