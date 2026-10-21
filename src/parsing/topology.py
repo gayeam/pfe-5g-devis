@@ -14,9 +14,9 @@ information de conception : les deux peuvent diverger.
 
 Statut :
 - « suivi » : au moins une antenne atteinte, le mode est déduit du suivi ;
-- « chaine_non_suivie » : aucune antenne atteinte. Le rapport ne contient pas
-  la suite de la chaîne (ex. filtre « DL/UL (RAN) » sans sortie listée).
-  Le mode reste vide : on ne le déduit pas.
+- « chaine_non_suivie » : aucune antenne atteinte. Le mode est alors présumé
+  d'après le nombre de câbles de sortie de la tête : deux câbles -> MIMO,
+  un seul -> SISO.
 """
 
 from collections import defaultdict
@@ -76,7 +76,7 @@ def trace_bts(routing):
 
 
 def bts_summary(routing, trace):
-    """Une ligne par BTS (= système) : bande, techno, secteur, étage, statut et mode déduit du suivi."""
+    """Une ligne par BTS (= système) : bande, techno, secteur, étage, statut et mode."""
     heads = routing[routing["source_node"].str.startswith("BTS")].drop_duplicates("source_node")
     rows = []
     for head in heads.itertuples(index=False):
@@ -88,10 +88,10 @@ def bts_summary(routing, trace):
         ports = sorted(set(t["port"].dropna())) if len(t) else []
         modes = sorted(set(t["mode_label"].dropna())) if len(t) else []
         traced = len(per_antenna) > 0
-        if not traced:
-            mode = None
-        else:
+        if traced:
             mode = "MIMO" if max_ports >= 2 else "SISO"
+        else:
+            mode = "MIMO" if cables_out >= 2 else "SISO"
         rows.append(
             {
                 "bts": bts,

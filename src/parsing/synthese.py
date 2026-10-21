@@ -2,7 +2,7 @@
 
 La ligne résume :
 - le type de DAS (actif, passif ou hybride), déduit des équipements du routage ;
-- pour chaque bande, le mode suivi (MIMO, SISO ou mixte selon le secteur) ;
+- pour chaque bande, le mode (MIMO, SISO ou mixte selon le secteur) ;
 - les bandes et technologies présentes ;
 - le nombre d'opérateurs estimé, et leurs noms s'ils sont dans la légende ;
 - les étages des têtes radio (le ou les locaux techniques).
@@ -82,8 +82,7 @@ def _sectors(values):
 def band_modes(bts):
     """Pour chaque bande : mode par secteur, du type « MIMO (s1, s2) » ou « mixte : MIMO (s1), SISO (s2) »."""
     result = []
-    traced = bts[bts["status"] == "suivi"]
-    for (freq, gen), group in traced.groupby(["freq_mhz", "generation"], dropna=False):
+    for (freq, gen), group in bts.groupby(["freq_mhz", "generation"], dropna=False):
         label = band_label(freq, gen)
         mimo = _sectors(group.loc[group["mode"] == "MIMO", "sector"])
         siso = _sectors(group.loc[group["mode"] == "SISO", "sector"])

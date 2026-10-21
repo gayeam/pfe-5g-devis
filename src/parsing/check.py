@@ -72,7 +72,7 @@ def controls(study_dir, site_name=None):
             ("Bretelles (design)", len(jumpers), n_jumpers_elr, "ELR"),
             ("Connecteurs = 2 × coax ?", 2 * n_coax, n_connectors_elr, "ELR"),
             ("Systèmes BTS (design)", len(bts), None, "suivi BTS"),
-            ("Systèmes en MIMO (suivi)", n_mimo, None, "suivi BTS"),
+            ("Systèmes en MIMO", n_mimo, None, "suivi ou présomption"),
             ("Systèmes non suivis", n_not_traced, None, "suivi BTS"),
         ],
     }
