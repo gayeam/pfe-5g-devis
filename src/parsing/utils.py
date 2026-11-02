@@ -23,7 +23,9 @@ def to_float(value):
         return None
     if isinstance(value, (int, float)):
         return float(value)
-    match = _NUM_RE.search(str(value))
+    # Séparateur de milliers éventuel : « 1 245,22 m » -> « 1245,22 m ».
+    text = re.sub(r"(?<=\d)[ \xa0 ](?=\d{3}\b)", "", str(value))
+    match = _NUM_RE.search(text)
     if not match:
         return None
     return float(match.group(0).replace(",", "."))
@@ -34,5 +36,6 @@ def split_unit(value):
     number = to_float(value)
     if number is None:
         return None, ""
-    rest = _NUM_RE.sub("", str(value), count=1).strip()
+    text = re.sub(r"(?<=\d)[ \xa0 ](?=\d{3}\b)", "", str(value))
+    rest = _NUM_RE.sub("", text, count=1).strip()
     return number, rest

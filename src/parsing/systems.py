@@ -17,7 +17,7 @@ NR_RE = re.compile(r"\bNR\b")
 
 
 def generation(text):
-    """Génération déduite du libellé. LTE et LTE-A = 4G, NR = 5G.
+    """Génération déduite du libellé. LTE et LTE-A = 4G, NR = 5G, UMTS / HSPA / WCDMA = 3G.
 
     « DCS » seul (sans LTE) est une bande GSM, donc 2G.
     """
@@ -25,7 +25,7 @@ def generation(text):
         return "5G"
     if "LTE" in text:
         return "4G"
-    if "UMTS" in text or "HSPA" in text:
+    if "UMTS" in text or "HSPA" in text or "WCDMA" in text:
         return "3G"
     if "GSM" in text or "DCS" in text:
         return "2G"

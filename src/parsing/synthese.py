@@ -2,7 +2,7 @@
 
 La ligne résume :
 - le type de DAS (actif, passif ou hybride), déduit des équipements du routage ;
-- pour chaque bande, le mode (MIMO, SISO ou mixte selon le secteur) ;
+- pour chaque bande, le mode suivi (MIMO, SISO ou mixte selon le secteur) ;
 - les bandes et technologies présentes ;
 - le nombre d'opérateurs estimé, et leurs noms s'ils sont dans la légende ;
 - les étages des têtes radio (le ou les locaux techniques).
@@ -11,7 +11,7 @@ Règle du type de DAS :
 - passif : seulement des splitters, filtres, matrices, atténuateurs ;
 - actif : des unités radio ou hubs actifs, sans passif ;
 - hybride : les deux.
-La famille « MC » n'est pas classée (rôle inconnu) : elle n'influence pas le type.
+Une famille inconnue (ex. « CU », « MSC ») n'influence pas le type.
 """
 
 import re
@@ -21,6 +21,10 @@ ACTIVE_FAMILIES = {
     "gHOU", "HOU", "gMU", "MU", "gRFU", "RFU", "DAU",
     "HRN", "gHRN", "MRN", "gMRN", "LRN", "gLRN", "IRU", "DOT",
     "BDAHUB", "FBDA",
+    # MC : « Media Converter » dans l'ELR (unités radio LRN).
+    "MC",
+    # NEU / PBMU : extension optique et unité maître d'un DAS actif.
+    "NEU", "PBMU",
 }
 
 FAMILY_RE = re.compile(r"^[A-Za-z]+")
@@ -106,16 +110,20 @@ def site_summary(name, routing, bts, operators=None):
     « operators » : liste des noms d'opérateurs si la légende les donne (sinon None).
     """
     kind, active, passive = das_type(routing)
-    n_ops = operators_estimate(bts)
+    # La légende fait foi ; l'estimation par les BTS ne sert qu'à défaut
+    # (plusieurs BTS d'un même système ne sont pas toujours des opérateurs différents).
+    n_ops = len(operators) if operators else operators_estimate(bts)
     bands = sorted({band_label(r.freq_mhz, r.generation) for r in bts.itertuples(index=False)})
     modes = band_modes(bts)
     not_traced = int((bts["status"] != "suivi").sum())
     floors = sorted({f for f in bts["floor"].dropna()}) if len(bts) else []
 
-    if n_ops <= 1:
-        op_text = "mono-opérateur"
+    names = f" ({', '.join(operators)})" if operators else " (estimé)"
+    if n_ops == 0:
+        op_text = "opérateurs : non déterminé"
+    elif n_ops == 1:
+        op_text = f"mono-opérateur{names}"
     else:
-        names = f" ({', '.join(operators)})" if operators else ""
         op_text = f"multi-opérateurs : {n_ops}{names}"
 
     line = (
