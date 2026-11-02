@@ -221,3 +221,8 @@ __marimo__/
 
 # Données d'études (confidentielles) : jamais dans le dépôt
 data/
+
+
+
+node_modules/
+frontend/dist/

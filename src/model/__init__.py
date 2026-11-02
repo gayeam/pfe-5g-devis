@@ -1,0 +1,1 @@
+"""Modèle de prédiction des quantités de l'ELR à partir du corpus d'études."""

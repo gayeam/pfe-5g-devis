@@ -33,3 +33,11 @@ mypy==1.7.1
 pandas>=2.0
 openpyxl>=3.1
 pdfplumber>=0.11
+
+
+# pour le modèle de ML (classification des systèmes)
+scikit-learn>=1.5
+
+fastapi>=0.115
+uvicorn>=0.30
+sqlalchemy>=2.0
