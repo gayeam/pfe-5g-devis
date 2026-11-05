@@ -8,7 +8,9 @@ Entrées : ce qu'on connaît avant la conception.
 - locaux techniques : nombre, et niveau du plus bas (sous-sol négatif, RDC 0, R+n positif) ;
 - hauteur des antennes (2,5 m par défaut) ;
 - méthode : VPLE ou FRT ;
-- surface prédite (m²) : utilisée seulement quand elle est saisie pour toutes les études de train.
+- surface prédite (m²) et nombre d'étages couverts (surface prédite non nulle) : utilisés quand
+  la surface est connue pour la plupart des études de train (MIN_SURFACE_SHARE). Les études
+  de train sans surface sont alors écartées de l'apprentissage.
 
 Le type de DAS (passif, actif, hybride) n'est pas une entrée saisie : c'est un scénario.
 Le modèle l'apprend sur les études passées, puis donne une estimation pour chacun des
@@ -38,6 +40,10 @@ BASE_FEATURES = [
 ]
 DAS_FEATURES = [f"das_{t}" for t in DAS_TYPES]
 SURFACE_FEATURE = "surface_predite_m2"
+COVERED_FEATURE = "etages_couverts"
+SURFACE_FEATURES = [SURFACE_FEATURE, COVERED_FEATURE]
+# Part minimale des études de train avec une surface pour s'en servir comme entrée.
+MIN_SURFACE_SHARE = 0.6
 DEFAULT_HEIGHT_M = 2.5
 
 # Sorties prédites, avec leur unité (pour l'affichage).
@@ -123,16 +129,24 @@ def features(df, use_surface=False):
     columns = BASE_FEATURES + DAS_FEATURES
     if use_surface:
         X[SURFACE_FEATURE] = pd.to_numeric(df[SURFACE_FEATURE], errors="coerce")
-        columns = BASE_FEATURES + [SURFACE_FEATURE] + DAS_FEATURES
+        covered = pd.to_numeric(df.get(COVERED_FEATURE, pd.Series(np.nan, index=df.index)), errors="coerce")
+        # Sans le détail par étage, on suppose tous les étages couverts.
+        X[COVERED_FEATURE] = covered.fillna(X["etages"]).clip(lower=1)
+        columns = BASE_FEATURES + SURFACE_FEATURES + DAS_FEATURES
     return X[columns]
 
 
-def surface_available(df):
-    """Vrai si la surface prédite est saisie pour toutes les études."""
+def has_surface(df):
+    """Masque des études dont la surface prédite est connue et non nulle."""
     if SURFACE_FEATURE not in df:
-        return False
+        return pd.Series(False, index=df.index)
     values = pd.to_numeric(df[SURFACE_FEATURE], errors="coerce")
-    return bool(len(values)) and bool(values.notna().all())
+    return values.notna() & (values > 0)
+
+
+def surface_available(df, min_share=MIN_SURFACE_SHARE):
+    """Vrai si la surface prédite est connue pour au moins min_share des études."""
+    return bool(len(df)) and float(has_surface(df).mean()) >= min_share
 
 
 def targets(df):
@@ -145,7 +159,7 @@ def targets(df):
 
 def features_from_inputs(columns, das, bandes, bande_5g, operateurs, mimo, etages,
                          locaux_techniques=1, niveau_local=0, hauteur_antennes=DEFAULT_HEIGHT_M,
-                         methode="VPLE", surface=None):
+                         methode="VPLE", surface=None, etages_couverts=None):
     """Entrées du modèle pour une nouvelle étude et un type de DAS (scénario)."""
     values = {
         "bandes": bandes,
@@ -158,6 +172,7 @@ def features_from_inputs(columns, das, bandes, bande_5g, operateurs, mimo, etage
         "hauteur_antennes": hauteur_antennes,
         "methode_frt": int(methode == "FRT"),
         SURFACE_FEATURE: surface,
+        COVERED_FEATURE: max(etages_couverts or etages, 1),
     }
     for t in DAS_TYPES:
         values[f"das_{t}"] = int(t == das)

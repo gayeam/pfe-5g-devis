@@ -4,7 +4,9 @@ Trois étapes :
 
 1. template : liste les dossiers d'études dans le dossier racine (ex. data/) et écrit
    - etudes.xlsx : une ligne par étude (site_id pré-rempli ; split et methode en liste déroulante) ;
-   - etages.xlsx : une ligne par étude et par étage (surfaces à saisir) ;
+   - etages.xlsx : une ligne par étude et par étage. Les surfaces sont pré-remplies depuis
+     l'Area Report de l'étude s'il est présent (plan area -> surface_totale_m2,
+     pred area -> surface_predite_m2) ; sinon elles sont à saisir ;
    - zones.xlsx : une ligne par zone (environnement en liste déroulante, VPLE seulement).
 
 2. split (facultatif) : remplit automatiquement la colonne split de etudes.xlsx,
@@ -15,14 +17,17 @@ Trois étapes :
      et split si on ne lance pas la commande split ;
    - etages.xlsx : surface_totale_m2 et surface_predite_m2 (vide = même valeur que la totale) ;
    - zones.xlsx : une ligne par zone, avec sa surface et, pour une étude VPLE, son environnement.
+     Il suffit de saisir les zones qui ne sont pas en « Medium RF environment » : comme dans
+     iBwave, le reste de la surface de prédiction de l'étage compte en Medium (défaut).
      Pour une étude FRT, les zones ne se renseignent que par leur surface : pas d'environnement.
 
 3. build : vérifie la saisie, calcule les agrégats, écrit train/dataset.csv et test/dataset.csv.
 
 Règles :
 - toutes les études d'un même site vont du même côté (split au niveau du site) ;
-- une étude qui couvre plusieurs bâtiments (étages nommés « BAT … ») est écartée :
-  son ELR est global et ne peut pas être réparti par bâtiment.
+- une étude qui couvre plusieurs bâtiments reste un seul échantillon : son ELR est global et ne
+  peut pas être réparti par bâtiment (tête de réseau, rocades et passifs partagés). Ses surfaces
+  sont additionnées et le nombre de bâtiments devient une entrée (buildings_count).
 
 Usage :
     python -m src.parsing.corpus template --root data
@@ -49,6 +54,7 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.worksheet.datavalidation import DataValidation
 
+from .area import parse_area_report, report_header, same_project
 from .check import is_study, study_files
 from .dataset import _join, buildings, study_row
 from .routing import parse_routing
@@ -79,14 +85,21 @@ ZONES_COLUMNS = ["study_folder", "etage", "zone", "surface_m2", "environnement"]
 
 SPLITS = ["train", "test"]
 METHODS = ["VPLE", "FRT"]
+# Environnements VPLE d'iBwave (Layers > Floor plans > Areas > Environments).
 ENVIRONMENTS = [
+    "Very dense RF environment",
     "Dense RF environment",
     "Medium RF environment",
     "Light RF environment",
     "Semi-open space",
     "Open space",
+    "Atrium",
 ]
-DENSE_LABEL = "Dense RF environment"
+DENSE_LABELS = {"Very dense RF environment", "Dense RF environment"}
+# Séparateur des noms d'étage des études sur plusieurs bâtiments : « Building 2 | RDC ».
+BUILDING_SEP = "|"
+# Environnement par défaut d'iBwave : toute surface sans environnement dessiné est en Medium.
+DEFAULT_ENVIRONMENT = "Medium RF environment"
 
 # Le nom du site est le nom du dossier, sans ce qui distingue les versions d'une même étude :
 # - un numéro final séparé : « SITE A 2 », « SITE_A_3 », « SITE A-2 », « SITE A V12-V13 »,
@@ -218,6 +231,34 @@ def floors_of(study_dir):
     return sorted(set(routing["source_floor"].dropna()) | set(routing["dest_floor"].dropna()))
 
 
+def area_of(study_dir):
+    """Surfaces de l'Area Report de l'étude (DataFrame), ou None.
+
+    None s'il n'y a pas d'Area Report, s'il est illisible, ou s'il ne concorde pas avec le
+    rapport antennes (nom du projet différent dans l'en-tête) : il vient
+    sans doute d'une autre étude. Dans ce dernier cas, un message le signale.
+    """
+    files = study_files(study_dir)
+    path = files.get("area")
+    if path is None:
+        return None
+    reference = report_header(files["antennas"])
+    if reference["nom"] is None:  # en-tête du rapport antennes illisible : on essaie le routage
+        reference = report_header(files["routing"])
+    area_header = report_header(path)
+    if same_project(area_header, reference) is False:
+        print(
+            f"Area Report écarté (autre projet : « {area_header['nom']} », "
+            f"rapport antennes : « {reference['nom']} ») : {study_dir}"
+        )
+        return None
+    try:
+        area = parse_area_report(path)
+    except Exception:  # un rapport illisible ne bloque pas : surfaces à saisir à la main
+        return None
+    return area if len(area) else None
+
+
 def write_templates(root):
     """Écrit etudes.xlsx, etages.xlsx et zones.xlsx à partir des dossiers présents.
 
@@ -230,18 +271,41 @@ def write_templates(root):
         print(f"Dossier des études introuvable : {studies_dir} (y ranger un dossier par étude)")
         return
     inputs_dir.mkdir(parents=True, exist_ok=True)
-    floors, incomplete = {}, []
+    floors, areas, incomplete = {}, {}, []
     for s in list_studies(studies_dir):
         try:
             floors[s] = floors_of(studies_dir / s)
+            areas[s] = area_of(studies_dir / s)
         except (FileNotFoundError, NotImplementedError) as e:
             incomplete.append((s, str(e)))
-    excluded = [s for s, f in floors.items() if len(buildings(f)) > 1]
-    studies = [s for s in floors if s not in excluded]
+
+    studies = list(floors)
     for s, reason in incomplete:
         print(f"Étude ignorée ({reason}) : {s}")
-    for s in excluded:
-        print(f"Étude écartée (plusieurs bâtiments : {', '.join(buildings(floors[s]))}) : {s}")
+
+    # Surfaces de l'Area Report : étage -> (surface du plan, surface de prédiction).
+    # - un seul bâtiment : les étages de l'Area Report s'ajoutent à ceux du routage (mêmes noms) ;
+    # - plusieurs bâtiments : on prend les étages de l'Area Report, nommés « bâtiment | étage »
+    #   pour qu'ils restent distincts (« RDC » peut exister dans deux bâtiments).
+    surfaces, multi = {}, []
+    for s in studies:
+        area = areas[s]
+        if area is None:
+            continue
+        several = area["batiment"].nunique() > 1
+        if several:
+            multi.append(s)
+        labels = [f"{b} {BUILDING_SEP} {e}" if several else e for b, e in zip(area["batiment"], area["etage"])]
+        for label, r in zip(labels, area.itertuples(index=False)):
+            surfaces[(s, label)] = (r.surface_plan_m2, r.surface_predite_m2)
+        floors[s] = sorted(labels) if several else sorted(set(floors[s]) | set(labels))
+    with_area = sum(1 for s in studies if areas[s] is not None)
+    for s in multi:
+        print(f"Étude sur plusieurs bâtiments (gardée dans le corpus, écartée de l'entraînement par défaut) : {s}")
+    # Surface prédite nettement supérieure au plan (> 5 %) : possible dans iBwave, mais à contrôler.
+    for (s, label), (plan, pred) in surfaces.items():
+        if pred and pred > 1.05 * (plan or 0):
+            print(f"À vérifier : surface prédite > plan ({pred:.0f} m² pour {plan:.0f} m²) : {s}, étage {label}")
 
     etudes = pd.DataFrame(
         {
@@ -259,10 +323,19 @@ def write_templates(root):
     etudes = _merge_existing(etudes, etudes_path, ["study_folder"], ["site_id", "split", "methode"])
     _write_xlsx(etudes, etudes_path, {"split": SPLITS, "methode": METHODS})
 
+    def _cell(value):
+        return "" if value is None or value != value else f"{value:.2f}"
+
     etages_rows = []
     for s in studies:
+        # Avec un Area Report, un étage du routage qui n'y figure pas (local technique…) vaut 0 :
+        # il n'est pas dans la zone de prédiction. Sans Area Report, les surfaces sont à saisir.
+        missing_value = (0.0, 0.0) if areas[s] is not None else (None, None)
         for floor in floors[s]:
-            etages_rows.append({"study_folder": s, "etage": floor, "surface_totale_m2": "", "surface_predite_m2": ""})
+            plan, pred = surfaces.get((s, floor), missing_value)
+            etages_rows.append(
+                {"study_folder": s, "etage": floor, "surface_totale_m2": _cell(plan), "surface_predite_m2": _cell(pred)}
+            )
     etages = pd.DataFrame(etages_rows, columns=ETAGES_COLUMNS)
     etages = _merge_existing(
         etages, inputs_dir / ETAGES_FILE, ["study_folder", "etage"], ["surface_totale_m2", "surface_predite_m2"]
@@ -292,6 +365,7 @@ def write_templates(root):
     new_studies = [s for s in studies if s not in known]
     print(f"{len(studies)} étude(s) listée(s) dans {etudes_path}" + (f", dont {len(new_studies)} nouvelle(s)" if known else ""))
     print(f"{len(etages)} étage(s) dans {inputs_dir / ETAGES_FILE}")
+    print(f"Surfaces pré-remplies depuis l'Area Report pour {with_area} étude(s) sur {len(studies)}")
     print(f"{len(zones)} ligne(s) de zone dans {zones_path} ({len(added)} ajoutée(s))")
 
 
@@ -360,7 +434,7 @@ def split_studies(root, test_ratio=0.2, seed=42, force=False):
 
 
 def similar_sites(etudes):
-    """Groupes de site_id différents qui commencent par le même mot (ex. « ZENITH NANCY » / « ZENITH SOLID »)."""
+    """Groupes de site_id différents qui commencent par le même mot (ex. « SITE NORD » / « SITE SUD »)."""
     groups = {}
     for site in sorted(set(etudes["site_id"])):
         first = re.split(r"[\s\-]+", site.strip().upper())[0]
@@ -401,17 +475,19 @@ def check_inputs(etudes, etages, zones):
         if not r.surface_totale_m2:
             missing[r.study_folder] = missing.get(r.study_folder, 0) + 1
             continue
+        # Une surface à 0 est permise (étage non couvert ou non dessiné dans iBwave), et la
+        # surface de prédiction peut dépasser celle du plan (zone de prédiction plus large).
         total = _num(r.surface_totale_m2)
-        if total is None or total <= 0:
+        if total is None or total < 0:
             errors.append(f"{r.study_folder} étage {r.etage} : surface totale invalide")
             continue
-        floor_totals[(r.study_folder, r.etage)] = total
+        pred = total
         if r.surface_predite_m2:
             pred = _num(r.surface_predite_m2)
-            if pred is None:
+            if pred is None or pred < 0:
                 errors.append(f"{r.study_folder} étage {r.etage} : surface de prédiction invalide")
-            elif pred > total:
-                errors.append(f"{r.study_folder} étage {r.etage} : surface de prédiction supérieure à la totale")
+                continue
+        floor_totals[(r.study_folder, r.etage)] = max(total, pred)
 
     for study, n in missing.items():
         warnings.append(f"{study} : surface totale non saisie sur {n} étage(s), surfaces laissées vides")
@@ -467,23 +543,32 @@ def study_surfaces(study, methode, etages, zones):
         if pred is not None:
             pred_parts.append(f"{f.etage}:{pred:g} m2")
 
-        z = study_zones[study_zones["etage"] == f.etage]
-        if z.empty or methode != "VPLE":
+        if methode != "VPLE":
             continue
-        by_env = z.groupby("environnement")["surface"].sum()
-        if len(by_env):
-            env_parts.append(f"{f.etage}:{by_env.idxmax()}")
-        zone_total = z["surface"].sum()
-        dense_total = z.loc[z["environnement"] == DENSE_LABEL, "surface"].sum()
-        if zone_total > 0:
-            dense_parts.append(f"{f.etage}:{100 * dense_total / zone_total:.0f} %")
+        z = study_zones[study_zones["etage"] == f.etage]
+        by_env = z.groupby("environnement")["surface"].sum() if len(z) else pd.Series(dtype=float)
+        # Comme dans iBwave, la surface de prédiction non couverte par une zone est en Medium (défaut).
+        if pred is not None:
+            rest = pred - float(by_env.sum())
+            if rest > 0:
+                by_env[DEFAULT_ENVIRONMENT] = by_env.get(DEFAULT_ENVIRONMENT, 0.0) + rest
+        if by_env.empty or by_env.sum() <= 0:
+            continue
+        env_parts.append(f"{f.etage}:{by_env.idxmax()}")
+        dense_total = float(by_env[[e for e in by_env.index if e in DENSE_LABELS]].sum())
+        dense_parts.append(f"{f.etage}:{100 * dense_total / float(by_env.sum()):.0f} %")
 
     # Une somme incomplète serait fausse : vide si un étage n'a pas de surface.
     complete = len(totals) > 0 and all(t is not None for t in totals)
+    labels = list(floors["etage"])
     result = {
         "surface_totale_m2": round(sum(totals), 2) if complete else None,
         "surface_predite_m2": round(sum(predicted), 2) if complete else None,
         "surface_predite_par_etage": _join(pred_parts),
+        # Étages couverts : surface de prédiction non nulle.
+        "etages_couverts": sum(1 for p in predicted if p) if complete else None,
+        # Bâtiments de l'Area Report (étages nommés « bâtiment | étage »), 1 sinon.
+        "batiments_area": len({l.split(BUILDING_SEP)[0].strip() for l in labels if BUILDING_SEP in l}) or 1,
         "zones_nb": len(study_zones),
     }
     if methode == "VPLE":
@@ -577,9 +662,6 @@ def build(root, use_cache=True):
         except Exception as e:  # une étude illisible ne doit pas bloquer les autres
             print(f"ignorée ({type(e).__name__} : {e})", flush=True)
             continue
-        if row["buildings_count"] > 1:
-            print(f"écartée (plusieurs bâtiments : {row['buildings_list']})", flush=True)
-            continue
         from_cache += cached
         print("ok (cache)" if cached else f"ok ({time.time() - t0:.0f} s)", flush=True)
         row = {"study_folder": r.study_folder, **row}  # identifiant unique de l'étude (chemin sous etudes/)
@@ -587,6 +669,8 @@ def build(root, use_cache=True):
         row["split"] = r.split
         row["methode"] = r.methode
         row.update(study_surfaces(r.study_folder, r.methode, etages, zones))
+        # Plusieurs bâtiments : l'étude reste un seul échantillon (ELR global), avec leur nombre.
+        row["buildings_count"] = max(int(row.get("buildings_count") or 1), int(row.pop("batiments_area")))
         rows.append(row)
 
     print(f"{len(rows)} étude(s) lue(s) en {(time.time() - start) / 60:.1f} min, dont {from_cache} depuis le cache")

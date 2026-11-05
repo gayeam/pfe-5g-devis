@@ -10,6 +10,7 @@ Le dossier doit contenir (noms exacts, majuscules indifférentes) :
     Cable Routing Report.pdf    (ou .xlsx)
 et peut contenir :
     Electromagnetic Field Report.pdf  (hauteurs d'antennes si absentes du rapport antennes)
+    Area Report.pdf (ou .xlsx)        (surfaces par étage)
 
 Le script affiche les totaux, les systèmes (BTS), les modes déduits du suivi,
 la ligne de synthèse du site et les écarts avec l'ELR. Il ne corrige rien.
@@ -30,6 +31,7 @@ STUDY_FILES = {
     "antennas": ["Antennas Report.pdf", "Antennas Report.xlsx"],
     "routing": ["Cable Routing Report.pdf", "Cable Routing Report.xlsx"],
     "em": ["Electromagnetic Field Report.pdf"],
+    "area": ["Area Report.pdf", "Area Report.xlsx"],
 }
 REQUIRED_FILES = ("elr", "antennas", "routing")
 

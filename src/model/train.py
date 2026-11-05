@@ -2,6 +2,7 @@
 
 Usage :
     python -m src.model.train --root data
+    python -m src.model.train --root data --multi-bat   (garde les études sur plusieurs bâtiments)
 
 Entrées et sorties : voir src/model/features.py. Le type de DAS sert de scénario :
 le modèle l'apprend sur les études passées, et la prédiction donne une estimation par type.
@@ -9,6 +10,7 @@ le modèle l'apprend sur les études passées, et la prédiction donne une estim
 Pour chaque sortie, trois modèles sont comparés :
 - mediane : médiane des études de train du même type de DAS. C'est la référence simple :
   un modèle plus complexe doit faire mieux pour être retenu ;
+- ratio_surface (si la surface est utilisée) : densité au m² du même type de DAS × surface ;
 - ridge : régression linéaire régularisée ;
 - foret : forêt aléatoire.
 
@@ -41,16 +43,19 @@ from sklearn.model_selection import GroupKFold, cross_val_predict
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from .estimators import MedianByDas
-from .features import TARGETS, features, load_corpus, surface_available, targets
+from .estimators import MedianByDas, RatioSurfaceByDas
+from .features import MIN_SURFACE_SHARE, TARGETS, features, has_surface, load_corpus, surface_available, targets
 
 MODEL_DIR = "modeles"
 VERSION = "v1"
 
 
-def candidate_models():
+def candidate_models(use_surface=False):
+    models = {"mediane": MedianByDas()}
+    if use_surface:
+        models["ratio_surface"] = RatioSurfaceByDas()
     return {
-        "mediane": MedianByDas(),
+        **models,
         "ridge": make_pipeline(StandardScaler(), Ridge(alpha=1.0)),
         "foret": RandomForestRegressor(n_estimators=300, min_samples_leaf=2, random_state=0),
     }
@@ -68,13 +73,26 @@ def within(y_true, y_pred, tolerance=0.2):
     return float(np.mean(np.abs(y_pred[mask] - y_true[mask]) <= tolerance * y_true[mask]))
 
 
-def evaluate(root):
+def evaluate(root, multi_bat=False):
     root = Path(root)
     corpus = load_corpus(root)
+    if not multi_bat and "buildings_count" in corpus:
+        # Leur ELR est global : les liaisons entre bâtiments dépendent de distances inconnues.
+        several = pd.to_numeric(corpus["buildings_count"], errors="coerce").fillna(1) > 1
+        if several.any():
+            print(f"{int(several.sum())} étude(s) sur plusieurs bâtiments écartée(s) (option --multi-bat pour les garder).")
+        corpus = corpus[~several]
     train = corpus[corpus["split"] == "train"].reset_index(drop=True)
     test = corpus[corpus["split"] == "test"].reset_index(drop=True)
 
     use_surface = surface_available(train)
+    if use_surface:
+        # Les études sans surface ne peuvent pas servir : on les écarte (train et test).
+        missing_train, missing_test = (~has_surface(train)).sum(), (~has_surface(test)).sum()
+        train = train[has_surface(train)].reset_index(drop=True)
+        test = test[has_surface(test)].reset_index(drop=True)
+        if missing_train or missing_test:
+            print(f"Surface inconnue : {missing_train} étude(s) de train et {missing_test} de test écartées.")
     X_train, Y_train = features(train, use_surface), targets(train)
     X_test, Y_test = features(test, use_surface), targets(test)
     groups = train["site_id"].astype(str).to_numpy()
@@ -83,7 +101,7 @@ def evaluate(root):
 
     print(f"Corpus : {len(train)} étude(s) en train ({n_sites} sites), {len(test)} en test.")
     print("Études de train par type de DAS :", train["das_type"].value_counts().to_dict())
-    print(f"Surface : {'utilisée' if use_surface else 'non utilisée (pas saisie pour toutes les études de train)'}.")
+    print(f"Surface : {'utilisée' if use_surface else f'non utilisée (connue pour moins de {MIN_SURFACE_SHARE:.0%} des études de train)'}.")
     if n_folds < 2:
         print("Pas assez de sites en train pour une validation croisée (2 au minimum).")
         return
@@ -101,13 +119,13 @@ def evaluate(root):
             continue
 
         scores = {}
-        for name, model in candidate_models().items():
+        for name, model in candidate_models(use_surface).items():
             pred = cross_val_predict(model, X_train, y, groups=groups, cv=GroupKFold(n_splits=n_folds))
             pred = np.clip(pred, 0, None)
             scores[name] = wape(y, pred)
             row[f"wape_cv_{name}"] = round(100 * scores[name], 1)
         best = min(scores, key=lambda k: scores[k] if not np.isnan(scores[k]) else np.inf)
-        model = candidate_models()[best].fit(X_train, y)
+        model = candidate_models(use_surface)[best].fit(X_train, y)
         chosen[target] = model
         row["modele_retenu"] = best
 
@@ -155,8 +173,9 @@ def evaluate(root):
 def main():
     parser = argparse.ArgumentParser(description="Entraîne et évalue le premier modèle")
     parser.add_argument("--root", default="data")
+    parser.add_argument("--multi-bat", action="store_true", help="garder les études sur plusieurs bâtiments")
     args = parser.parse_args()
-    evaluate(args.root)
+    evaluate(args.root, args.multi_bat)
 
 
 if __name__ == "__main__":
