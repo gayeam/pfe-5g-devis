@@ -120,4 +120,15 @@ Voir : [notebooks/01_exploration_ign.ipynb](notebooks/01_exploration_ign.ipynb)
 
 ---
 
-**Dernière mise à jour** : 12 oct 2026
+## commandes utiles
+python -m src.parsing.corpus template --root data
+python -m src.parsing.corpus split --root data
+python -m src.parsing.corpus build --root data
+python -m src.model.train --root data
+
+# Terminal 1 (backend)
+.venv\Scripts\Activate.ps1
+uvicorn src.api.main:app --reload
+
+
+**Dernière mise à jour** : 05 Novembre 2026
