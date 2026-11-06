@@ -130,11 +130,21 @@ def report_header(path):
 
 def same_project(header_a, header_b):
     """True si les deux en-têtes désignent le même projet, False s'ils diffèrent,
-    None si on ne peut pas le dire (nom absent d'un des deux rapports). Seul le nom est comparé."""
+    None si on ne peut pas le dire (nom absent d'un des deux rapports). Seul le nom est comparé.
+
+    Un nom trop long déborde dans le PDF et se mélange à « Design company: »
+    (« … CLICHDYesign company: » pour « … CLICHY ») : on accepte donc deux noms dont le début
+    commun couvre au moins 90 % du plus court.
+    """
     name_a, name_b = _norm(header_a["nom"]), _norm(header_b["nom"])
     if not name_a or not name_b:
         return None
-    return name_a == name_b
+    common = 0
+    for char_a, char_b in zip(name_a, name_b):
+        if char_a != char_b:
+            break
+        common += 1
+    return common >= 0.9 * min(len(name_a), len(name_b))
 
 
 def _pdf_rows(path):
