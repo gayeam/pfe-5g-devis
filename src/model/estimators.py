@@ -6,7 +6,7 @@ sous le nom provisoire « __main__ », et ne pourrait plus être relue par l'app
 
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.base import BaseEstimator, RegressorMixin, clone
 
 from .features import DAS_TYPES, SURFACE_FEATURE
 
@@ -74,3 +74,73 @@ class RatioSurfaceByDas(BaseEstimator, RegressorMixin):
         missing = ~(surface > 0)
         result[missing] = self.fallback_.predict(X)[missing]
         return result
+
+
+class RatioM2ByDas(BaseEstimator, RegressorMixin):
+    """Modèle par étage. Quantité = densité au m² (médiane des étages du même type de DAS) × surface."""
+
+    def fit(self, X, y):
+        X = pd.DataFrame(X)
+        surface = np.expm1(X["log_surface"].to_numpy(dtype=float))
+        y = np.asarray(y, dtype=float)
+        ok = surface > 0
+        ratio = np.where(ok, y / np.where(ok, surface, 1), np.nan)
+        self.global_ = float(np.nanmedian(ratio)) if ok.any() else 0.0
+        self.by_das_ = {}
+        for das in DAS_TYPES:
+            mask = (X[f"das_{das}"].to_numpy() == 1) & ok
+            if mask.any():
+                self.by_das_[das] = float(np.median(ratio[mask]))
+        return self
+
+    def predict(self, X):
+        X = pd.DataFrame(X)
+        ratio = np.full(len(X), self.global_)
+        for das, value in self.by_das_.items():
+            ratio[X[f"das_{das}"].to_numpy() == 1] = value
+        surface = np.nan_to_num(np.expm1(X["log_surface"].to_numpy(dtype=float)))
+        return ratio * surface
+
+
+class LogTarget(BaseEstimator, RegressorMixin):
+    """Apprend log(1 + quantité) puis revient à l'échelle réelle : les grands sites n'écrasent
+    plus les petits, et une erreur de 20 % pèse pareil sur un petit et un grand étage.
+    (Une correction de biais de Duan a été essayée le 6 novembre : elle dégradait les résultats.)"""
+
+    def __init__(self, model):
+        self.model = model
+
+    def fit(self, X, y):
+        self.model_ = clone(self.model).fit(X, np.log1p(np.clip(np.asarray(y, dtype=float), 0, None)))
+        return self
+
+    def predict(self, X):
+        return np.expm1(self.model_.predict(X))
+
+
+class RatioPerElement(BaseEstimator, RegressorMixin):
+    """Modèle par étage, câbles. Mètres = longueur médiane par élément (même type de DAS)
+    × nombre d'éléments de l'étage (colonne « elements »)."""
+
+    def fit(self, X, y):
+        X = pd.DataFrame(X)
+        n = X["elements"].to_numpy(dtype=float)
+        y = np.asarray(y, dtype=float)
+        ok = n > 0
+        ratio = np.where(ok, y / np.where(ok, n, 1), np.nan)
+        self.global_ = float(np.nanmedian(ratio)) if ok.any() else 0.0
+        self.by_das_ = {}
+        for das in DAS_TYPES:
+            column = f"das_{das}"
+            if column in X:
+                mask = (X[column].to_numpy() == 1) & ok
+                if mask.any():
+                    self.by_das_[das] = float(np.median(ratio[mask]))
+        return self
+
+    def predict(self, X):
+        X = pd.DataFrame(X)
+        ratio = np.full(len(X), self.global_)
+        for das, value in self.by_das_.items():
+            ratio[X[f"das_{das}"].to_numpy() == 1] = value
+        return ratio * np.nan_to_num(X["elements"].to_numpy(dtype=float))

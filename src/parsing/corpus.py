@@ -58,11 +58,13 @@ from .area import parse_area_report, report_header, same_project
 from .check import is_study, study_files
 from .dataset import _join, buildings, study_row
 from .routing import parse_routing
+from ..model.features import floor_level
 
 # Organisation du dossier racine (ex. data/) :
 #   data/etudes/  études brutes, un dossier par étude (ELR, rapports, .ibw…)
 #   data/saisie/  fichiers à remplir : etudes.xlsx, etages.xlsx, zones.xlsx
-#   data/corpus/  corpus produit : train/dataset.csv, test/dataset.csv
+#   data/corpus/  corpus produit : train/dataset.csv (une ligne par étude), train/etages.csv
+#                 (une ligne par étage), idem pour test/
 #   data/cache/   lecture des rapports déjà faite (une fiche par étude), réutilisée par build
 STUDIES_DIR = "etudes"
 INPUTS_DIR = "saisie"
@@ -79,11 +81,51 @@ def _dirs(root):
     root = Path(root)
     return root / STUDIES_DIR, root / INPUTS_DIR, root / OUTPUT_DIR
 
-ETUDES_COLUMNS = ["study_folder", "site_id", "split", "methode"]
-ETAGES_COLUMNS = ["study_folder", "etage", "surface_totale_m2", "surface_predite_m2"]
+ETUDES_COLUMNS = ["study_folder", "site_id", "split", "methode", "type_batiment"]
+
+# Types de bâtiment (liste déroulante de etudes.xlsx). Ils remplacent l'environnement abstrait
+# (« Dense », « Open space »…) : le modèle en tire des densités typiques mesurées sur les études.
+BUILDING_TYPES = [
+    "Hôpital / santé",
+    "Hôtel / résidence",
+    "Bureaux / administration",
+    "Commerce",
+    "Industrie / logistique",
+    "Aéroport / gare",
+    "Salle de spectacle / sport",
+    "Enseignement",
+    "Parking",
+    "Autre",
+]
+# Pré-remplissage d'après des mots génériques du nom de l'étude (aucun nom de client ici).
+# L'ordre compte : « Hôtel de police » est de l'administration, « Parking hôtel » un parking.
+BUILDING_TYPE_RULES = [
+    (r"PARKING", "Parking"),
+    (r"HOTEL[ _\-]+DE[ _\-]+(POLICE|VILLE|REGION|DEPARTEMENT)", "Bureaux / administration"),
+    (r"\bCHU?\b|HOPITAL|HÔPITAL|CLINIQUE|EHPAD|MEDICAL|SANTE|SANTÉ", "Hôpital / santé"),
+    (r"HOTEL|HÔTEL|RESIDENCE|RÉSIDENCE", "Hôtel / résidence"),
+    (r"AEROPORT|AÉROPORT|AEROGARE|AÉROGARE|AIRPORT|\bGARE\b", "Aéroport / gare"),
+    (r"ZENITH|ZÉNITH|ARENA|STADE|THEATRE|THÉÂTRE|SALLE|STADIUM|CONCERT", "Salle de spectacle / sport"),
+    (r"CENTRE[ _\-]+COMMERCIAL|\bCC\b|HYPERMARCHE|SUPERMARCHE|MAGASIN", "Commerce"),
+    (r"UNIVERSITE|UNIVERSITÉ|ECOLE|ÉCOLE|LYCEE|LYCÉE|COLLEGE|CAMPUS", "Enseignement"),
+    (r"USINE|TECHNICENTRE|ENTREPOT|ENTREPÔT|LOGISTIQUE|INDUSTRI", "Industrie / logistique"),
+    (r"SIEGE|SIÈGE|BUREAU|\bHQ\b|METROPOLE|MÉTROPOLE|AGGLO|MAIRIE|PREFECTURE", "Bureaux / administration"),
+]
+
+
+def guess_building_type(name):
+    """Type de bâtiment deviné d'après le nom du dossier, ou "" (à saisir) si aucun mot n'est reconnu."""
+    text = str(name).upper()
+    for pattern, building_type in BUILDING_TYPE_RULES:
+        if re.search(pattern, text):
+            return building_type
+    return ""
+ETAGES_COLUMNS = ["study_folder", "etage", "niveau", "surface_totale_m2", "surface_predite_m2"]
 ZONES_COLUMNS = ["study_folder", "etage", "zone", "surface_m2", "environnement"]
 
 SPLITS = ["train", "test"]
+EXCLUDED = "exclu"  # split à mettre à la main pour écarter une étude du corpus (navire, radio pro…)
+SPLIT_CHOICES = SPLITS + [EXCLUDED]
 METHODS = ["VPLE", "FRT"]
 # Environnements VPLE d'iBwave (Layers > Floor plans > Areas > Environments).
 ENVIRONMENTS = [
@@ -191,8 +233,9 @@ def _merge_existing(new, path, keys, keep):
     if not Path(path).exists():
         return new
     old = _read(path)
-    if not set(keys + keep).issubset(old.columns):
+    if not set(keys).issubset(old.columns):
         return new
+    keep = [c for c in keep if c in old.columns]  # colonne ajoutée depuis : valeur par défaut
     old = old.drop_duplicates(keys).set_index(keys)
     merged = new.copy()
     for i, row in merged.iterrows():
@@ -315,13 +358,18 @@ def write_templates(root):
             "split": "",
             # VPLE par défaut (cas le plus courant) ; passer à FRT à la main si besoin.
             "methode": "VPLE",
+            # Deviné d'après le nom ; à vérifier et compléter dans etudes.xlsx.
+            "type_batiment": [guess_building_type(s) for s in studies],
         },
         columns=ETUDES_COLUMNS,
     )
     etudes_path = inputs_dir / ETUDES_FILE
     known = set(_read(etudes_path)["study_folder"]) if etudes_path.exists() else set()
-    etudes = _merge_existing(etudes, etudes_path, ["study_folder"], ["site_id", "split", "methode"])
-    _write_xlsx(etudes, etudes_path, {"split": SPLITS, "methode": METHODS})
+    etudes = _merge_existing(etudes, etudes_path, ["study_folder"], ["site_id", "split", "methode", "type_batiment"])
+    _write_xlsx(etudes, etudes_path, {"split": SPLIT_CHOICES, "methode": METHODS, "type_batiment": BUILDING_TYPES})
+    unknown_types = int((etudes["type_batiment"].astype(str).str.strip() == "").sum())
+    if unknown_types:
+        print(f"Type de bâtiment à saisir dans {etudes_path} pour {unknown_types} étude(s) sur {len(etudes)}")
 
     def _cell(value):
         return "" if value is None or value != value else f"{value:.2f}"
@@ -333,12 +381,14 @@ def write_templates(root):
         missing_value = (0.0, 0.0) if areas[s] is not None else (None, None)
         for floor in floors[s]:
             plan, pred = surfaces.get((s, floor), missing_value)
+            level = floor_level(floor.split(BUILDING_SEP)[-1])
             etages_rows.append(
-                {"study_folder": s, "etage": floor, "surface_totale_m2": _cell(plan), "surface_predite_m2": _cell(pred)}
+                {"study_folder": s, "etage": floor, "niveau": "" if level is None else str(level),
+                 "surface_totale_m2": _cell(plan), "surface_predite_m2": _cell(pred)}
             )
     etages = pd.DataFrame(etages_rows, columns=ETAGES_COLUMNS)
     etages = _merge_existing(
-        etages, inputs_dir / ETAGES_FILE, ["study_folder", "etage"], ["surface_totale_m2", "surface_predite_m2"]
+        etages, inputs_dir / ETAGES_FILE, ["study_folder", "etage"], ["niveau", "surface_totale_m2", "surface_predite_m2"]
     )
     _write_xlsx(etages, inputs_dir / ETAGES_FILE, {})
 
@@ -381,9 +431,10 @@ def assign_splits(etudes, test_ratio=0.2, seed=42, force=False):
     df = etudes.copy()
     sizes = df.groupby("site_id").size()
     if force:
-        fixed = {}
+        # Même en forçant, une étude exclue à la main reste exclue.
+        fixed = df[df["split"] == EXCLUDED].groupby("site_id")["split"].first().to_dict()
     else:
-        done = df[df["split"].isin(SPLITS)]
+        done = df[df["split"].isin(SPLIT_CHOICES)]
         fixed = done.groupby("site_id")["split"].first().to_dict()
 
     free_sites = sorted(set(sizes.index) - set(fixed))
@@ -414,7 +465,8 @@ def split_studies(root, test_ratio=0.2, seed=42, force=False):
     _, inputs_dir, _ = _dirs(root)
     etudes = _read(inputs_dir / ETUDES_FILE)
     result = assign_splits(etudes, test_ratio, seed, force)
-    _write_xlsx(result, inputs_dir / ETUDES_FILE, {"split": SPLITS, "methode": METHODS})
+    _write_xlsx(result, inputs_dir / ETUDES_FILE,
+                {"split": SPLIT_CHOICES, "methode": METHODS, "type_batiment": BUILDING_TYPES})
 
     for split in SPLITS:
         part = result[result["split"] == split]
@@ -457,8 +509,8 @@ def check_inputs(etudes, etages, zones):
     errors, warnings = [], []
 
     for r in etudes.itertuples():
-        if r.split not in SPLITS:
-            errors.append(f"{r.study_folder} : split « {r.split} » invalide (train ou test attendu)")
+        if r.split not in SPLIT_CHOICES:
+            errors.append(f"{r.study_folder} : split « {r.split} » invalide (train, test ou exclu attendu)")
         if r.methode not in METHODS:
             errors.append(f"{r.study_folder} : méthode « {r.methode} » invalide (VPLE ou FRT attendu)")
     per_site = etudes.groupby("site_id")["split"].nunique()
@@ -580,7 +632,9 @@ def study_surfaces(study, methode, etages, zones):
 def _code_signature():
     """Empreinte du code de lecture : si le code change, le cache est refait."""
     digest = hashlib.sha256()
-    for path in sorted(Path(__file__).parent.glob("*.py")):
+    # corpus.py (assemblage du corpus) n'intervient pas dans la lecture des rapports : l'exclure
+    # évite de tout relire quand seul l'assemblage change.
+    for path in sorted(p for p in Path(__file__).parent.glob("*.py") if p.name != "corpus.py"):
         digest.update(path.name.encode())
         digest.update(path.read_bytes())
     return digest.hexdigest()[:16]
@@ -624,6 +678,102 @@ def cached_study_row(study_dir, folder, site_name, cache_dir, code_signature, us
     return row, False
 
 
+FLOORS_FILE = "etages.csv"
+
+
+def _floor_key(label):
+    return re.sub(r"\s+", "", str(label)).upper()
+
+
+def floor_rows(row, etages):
+    """Lignes du corpus par étage pour une étude : une par étage (routage ou Area Report).
+
+    Entrées de l'étage : surfaces (etages.xlsx), niveau, local technique sur l'étage, distance
+    au local le plus proche (en niveaux). Sorties : mesures du design de l'étage (routage).
+    Les entrées de l'étude (bandes, opérateurs, MIMO, type de DAS…) sont recopiées.
+    """
+    surfaces = {}
+    for e in etages[etages["study_folder"] == row["study_folder"]].itertuples(index=False):
+        level = _num(getattr(e, "niveau", None))
+        surfaces[_floor_key(e.etage)] = (e.etage, _num(e.surface_totale_m2), _num(e.surface_predite_m2), level)
+    # Plusieurs bâtiments : etages.xlsx nomme l'étage « Bat 10S | BAT 10S R0 », le routage « BAT 10S R0 ».
+    # On rapproche par la partie après « | », si elle n'existe que dans un seul bâtiment.
+    by_floor = {}
+    for key, value in surfaces.items():
+        if BUILDING_SEP in str(value[0]):
+            by_floor.setdefault(_floor_key(str(value[0]).split(BUILDING_SEP)[-1]), []).append(key)
+    several = bool(by_floor) or int(row.get("buildings_count") or 1) > 1
+    detail = {}
+    for d in json.loads(row.get("floors_detail") or "[]"):
+        key = _floor_key(d["etage"])
+        if key not in surfaces and len(by_floor.get(key, [])) == 1:
+            key = by_floor[key][0]
+        detail[key] = d
+    locals_ = [f.strip() for f in str(row.get("local_floors") or "").split(";") if f.strip()]
+    local_keys = {_floor_key(f) for f in locals_}
+    saisi = {k: v[3] for k, v in surfaces.items() if v[3] is not None}  # niveaux saisis dans etages.xlsx
+    local_levels = [saisi.get(_floor_key(f), floor_level(f)) for f in locals_]
+    local_levels = [lv for lv in local_levels if lv is not None]
+
+    study_columns = ["study_folder", "site_id", "split", "methode", "type_batiment", "das_type", "bands", "bands_count",
+                     "operators_count", "operators_names", "mimo_bands", "local_floors", "buildings_count"]
+    rows = []
+    for key in sorted(set(detail) | set(surfaces)):
+        d = detail.get(key, {})
+        label, plan, pred, level = surfaces.get(key, (d.get("etage"), None, None, None))
+        # Niveau saisi dans etages.xlsx, sinon lu dans le nom de l'étage.
+        level = int(level) if level is not None else floor_level(label)
+        rows.append({
+            **{c: row.get(c) for c in study_columns},
+            "etage": label,
+            "niveau": level,
+            "surface_plan_m2": plan,
+            "surface_predite_m2": pred,
+            "local_technique": int(key in local_keys),
+            # Plusieurs bâtiments : le local peut être dans un autre bâtiment, la distance en niveaux n'a pas de sens.
+            "distance_local": (min(abs(level - lv) for lv in local_levels)
+                               if level is not None and local_levels and not several else None),
+            "dans_routage": int(key in detail),
+            "elements": d.get("elements", 0),
+            "coax_n": d.get("coax_n", 0),
+            "coax_m": d.get("coax_m", 0.0),
+            "fibre_m": d.get("fibre_m", 0.0),
+            "cuivre_m": d.get("cuivre_m", 0.0),
+        })
+    return rows
+
+
+def floors_report(floors, studies):
+    """Bilan du corpus par étage : couverture des surfaces, niveaux reconnus, totaux recoupés."""
+    n = len(floors)
+    if not n:
+        print("Corpus par étage : aucun étage.")
+        return
+    with_surface = floors["surface_predite_m2"].notna().sum()
+    with_level = floors["niveau"].notna().sum()
+    print(f"\nCorpus par étage : {n} étage(s) dans {floors['study_folder'].nunique()} étude(s)")
+    print(f"  surface prédite connue : {with_surface} ({with_surface / n:.0%})")
+    print(f"  niveau connu (saisi dans etages.xlsx ou lu dans le nom) : {with_level} ({with_level / n:.0%})")
+    print(f"  distance au local connue : {floors['distance_local'].notna().sum()}")
+    print(f"  étages du routage sans surface (pas d'Area Report, ou nom différent) : "
+          f"{int(((floors['dans_routage'] == 1) & floors['surface_predite_m2'].isna()).sum())}")
+    unknown = sorted(set(floors.loc[floors["niveau"].isna(), "etage"].astype(str)))
+    if unknown:
+        print(f"  noms d'étage non reconnus ({len(unknown)}) : {' | '.join(unknown)}")
+    totals = floors.groupby("study_folder")[["elements", "coax_m"]].sum()
+    ref = studies.set_index("study_folder")[["design_elements", "design_coax_length_m"]]
+    joined = totals.join(ref, how="inner")
+    share_el = joined["elements"].sum() / max(joined["design_elements"].sum(), 1)
+    share_cx = joined["coax_m"].sum() / max(joined["design_coax_length_m"].sum(), 1)
+    print(f"  éléments rayonnants placés sur un étage : {share_el:.0%} du total des études")
+    print(f"  linéaire coax rattaché à un étage : {share_cx:.0%} du total des études")
+    gap = joined[joined["elements"] != joined["design_elements"]]
+    if len(gap):
+        print(f"  études où la somme des étages diffère du total d'éléments ({len(gap)}) :")
+        for name, r in gap.iterrows():
+            print(f"    {name} : {int(r['elements'])} sur les étages pour {int(r['design_elements'])} au total")
+
+
 def build(root, use_cache=True):
     """Construit train/dataset.csv et test/dataset.csv."""
     studies_dir, inputs_dir, output_dir = _dirs(root)
@@ -649,6 +799,10 @@ def build(root, use_cache=True):
             " leurs colonnes de surface resteront vides."
         )
 
+    excluded = etudes[etudes["split"] == EXCLUDED]
+    for name in excluded["study_folder"]:
+        print(f"Étude exclue (split « {EXCLUDED} » dans {ETUDES_FILE}) : {name}")
+    etudes = etudes[etudes["split"] != EXCLUDED]
     n = len(etudes)
     print(f"Lecture de {n} étude(s) (la première lecture des gros rapports peut prendre plusieurs minutes) :")
     rows, start, from_cache = [], time.time(), 0
@@ -668,6 +822,7 @@ def build(root, use_cache=True):
         row["site_id"] = r.site_id
         row["split"] = r.split
         row["methode"] = r.methode
+        row["type_batiment"] = getattr(r, "type_batiment", "") or ""
         row.update(study_surfaces(r.study_folder, r.methode, etages, zones))
         # Plusieurs bâtiments : l'étude reste un seul échantillon (ELR global), avec leur nombre.
         row["buildings_count"] = max(int(row.get("buildings_count") or 1), int(row.pop("batiments_area")))
@@ -675,12 +830,21 @@ def build(root, use_cache=True):
 
     print(f"{len(rows)} étude(s) lue(s) en {(time.time() - start) / 60:.1f} min, dont {from_cache} depuis le cache")
     df = pd.DataFrame(rows)
+    # Corpus par étage : toutes les études, y compris sur plusieurs bâtiments (leurs antennes et leur
+    # coax sont bien rattachés à un étage ; seules les liaisons entre bâtiments restent globales).
+    floors = pd.DataFrame([f for row in rows for f in floor_rows(row, etages)])
+    df = df.drop(columns=["floors_detail"], errors="ignore")
     for split in SPLITS:
         out = output_dir / split
         out.mkdir(parents=True, exist_ok=True)
         part = df[df["split"] == split]
         part.to_csv(out / "dataset.csv", index=False, sep=";", encoding="utf-8-sig")
         print(f"{split} : {len(part)} étude(s) -> {out / 'dataset.csv'}")
+        if len(floors):
+            fpart = floors[floors["split"] == split]
+            fpart.to_csv(out / FLOORS_FILE, index=False, sep=";", encoding="utf-8-sig")
+            print(f"{split} : {len(fpart)} étage(s) -> {out / FLOORS_FILE}")
+    floors_report(floors, df)
 
 
 def main():

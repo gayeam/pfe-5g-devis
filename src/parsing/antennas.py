@@ -59,7 +59,8 @@ LEGEND_COLUMNS = [
     "n_sources",
 ]
 
-TECHNOLOGIES = r"GSM|HSPA PLUS|HSPA\+?|WCDMA|UMTS|LTE-A|LTE|5G NR|NR"
+# Cellulaire, puis radio professionnelle (PMR : DMR, TETRA), présente dans quelques études.
+TECHNOLOGIES = r"GSM|HSPA PLUS|HSPA\+?|WCDMA|UMTS|LTE-A|LTE|5G NR|NR|DMR|TETRA"
 
 # Début d'une entrée de légende : « BOUYGUES / LTE / … ».
 ENTRY_START_RE = re.compile(rf"^[^/]+? / (?:{TECHNOLOGIES}) / ")
@@ -67,9 +68,10 @@ ENTRY_START_RE = re.compile(rf"^[^/]+? / (?:{TECHNOLOGIES}) / ")
 # Entrée complète, par exemple :
 # « BYT / LTE / 1800 MHz - DCS / FDD - 20 MHz - Band 3 / Sector number: 1 / Nb. of channels: 1 / Nb. of sources: 1 »
 # « BOUYGUES / GSM / 900 MHz - GSM / E-GSM900 / Sector number: 1 / 1 / Nb. of channels: 1 / Nb. of sources: 1 »
+# « X / TETRA / 390 MHz / 380-385 / 390-395 MHz / Sector number: … » (le canal peut contenir « / »)
 ENTRY_RE = re.compile(
     rf"^(?P<operator>[^/]+?) / (?P<technology>{TECHNOLOGIES}) / (?P<band_label>[^/]+?) / "
-    r"(?P<channel>[^/]+?) / Sector number:*\s*(?P<sectors>[\d /]*?)\s*/ "
+    r"(?P<channel>.+?) / Sector number:*\s*(?P<sectors>[\d /]*?)\s*/ "
     r"Nb\. of channels:\s*\d+\s*/ Nb\. of sources:\s*(?P<sources>\d+)"
 )
 
@@ -86,25 +88,49 @@ GENERATION = {
     "LTE-A": "4G",
     "5G NR": "5G",
     "NR": "5G",
+    "DMR": "PMR",
+    "TETRA": "PMR",
 }
+
+# Opérateurs de réseau mobile en France, et catégories des autres cas.
+OPERATORS = ["BOUYGUES", "ORANGE", "SFR", "FREE"]
+PRIVATE = "PRIVÉ"  # réseau privé, sans opérateur derrière (NOKIA, SNCF, PMR…)
+ANONYMOUS_RE = re.compile(r"^OP[EÉ]RATEUR\s*\d+$")  # « OPERATEUR 1 » : opérateur réel non nommé
 
 # Noms d'opérateurs normalisés (abréviations et variantes vues dans les rapports).
 OPERATOR_ALIASES = {
     "BYT": "BOUYGUES",
     "BT": "BOUYGUES",
+    "BYTEL": "BOUYGUES",
     "BOUYGUES": "BOUYGUES",
     "BOUYGUES TELECOM": "BOUYGUES",
     "OFR": "ORANGE",
+    "ORF": "ORANGE",
     "ORANGE": "ORANGE",
     "SFR": "SFR",
     "FREE": "FREE",
     "FREE MOBILE": "FREE",
 }
+OPERATOR_WORD_RE = re.compile(r"\b(" + "|".join(sorted(OPERATOR_ALIASES, key=len, reverse=True)) + r")\b")
 
 
 def normalize_operator(name):
+    """Nom d'opérateur normalisé : BOUYGUES, ORANGE, SFR, FREE, « OPERATEUR n » ou PRIVÉ.
+
+    - variante connue (« BYT », « Bouygues Telecom », « OFR »…) -> l'opérateur ;
+    - texte qui contient un opérateur (« 78712030 SFR », référence d'antenne « … ORANGE ») -> cet opérateur ;
+    - « OPERATEUR 1 » : gardé tel quel (opérateur réel, nom masqué dans l'étude) ;
+    - tout le reste (« NOKIA », « SNCF », « IFSI », PMR…) -> PRIVÉ.
+    """
     key = clean(name).upper()
-    return OPERATOR_ALIASES.get(key, key)
+    if key in OPERATOR_ALIASES:
+        return OPERATOR_ALIASES[key]
+    if ANONYMOUS_RE.match(key):
+        return re.sub(r"\s*(\d+)$", r" \1", key.replace("É", "E"))
+    found = OPERATOR_WORD_RE.findall(key.replace("_", " "))
+    if found:
+        return OPERATOR_ALIASES[found[-1]]
+    return PRIVATE
 
 
 def _num(cells, index):

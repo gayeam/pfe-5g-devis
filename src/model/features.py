@@ -79,18 +79,38 @@ def load_corpus(root):
     return pd.concat(frames, ignore_index=True)
 
 
-def floor_level(label):
-    """Niveau d'un étage : « SS-1 », « R-1 », « SS1 » -> -1 ; « RDC », « RDJ » -> 0 ; « R+2 », « R2 » -> 2."""
-    text = str(label).upper().replace(" ", "")
-    match = re.match(r"^(?:SS|R)-(\d+)$", text) or re.match(r"^SS(\d+)$", text)
+# Repère de niveau à l'intérieur d'un nom (« BAN R1 », « Bataclan_RDC », « Building 1 | R3 »).
+LEVEL_TOKEN_RE = re.compile(
+    r"(?:^|[\s_|/\-])(RDC|RDJ|REZ|(?:SS|NIVS)-?\d+|(?:R|N|NIV|NIVEAU|ET|ETAGE|ÉTAGE|FLOOR|DECK)\s?[+-]?\d+)(?=$|[\s_|/\-])",
+    re.IGNORECASE,
+)
+
+
+def _level_of(text):
+    if text in ("SS", "SOUS-SOL", "SOUSSOL"):
+        return -1
+    match = re.match(r"^(?:SS|R|N|NIV|NIVEAU)-(\d+)$", text) or re.match(r"^(?:SS|NIVS|S)-?(\d+)$", text)
     if match:
         return -int(match.group(1))
-    if text.startswith(("RDC", "RDJ", "REZ")) or text == "R0":
+    if text.startswith(("RDC", "RDJ", "REZ")) or text in ("R0", "N0", "NIV0"):
         return 0
-    match = re.match(r"^R\+?(\d+)$", text)
+    match = (re.match(r"^(?:R|N|NIV|NIVEAU|ET|ETAGE|ÉTAGE|FLOOR|DECK)\+?(\d+)$", text)
+             or re.match(r"^([+-]?\d+)$", text))
     if match:
         return int(match.group(1))
     return None
+
+
+def floor_level(label):
+    """Niveau d'un étage : « SS-1 », « R-1 », « SS1 », « N-1 », « -1 » -> -1 ; « RDC », « RDJ » -> 0 ;
+    « R+2 », « R2 », « N2 », « NIV 2 », « 2 » -> 2. Un nom composé est lu par son dernier repère
+    (« BAN R1 » -> 1, « Bataclan_RDC » -> 0). Renvoie None si aucun repère n'est reconnu."""
+    text = str(label).upper().strip()
+    level = _level_of(text.replace(" ", ""))
+    if level is not None:
+        return level
+    tokens = LEVEL_TOKEN_RE.findall(text)
+    return _level_of(tokens[-1].replace(" ", "")) if tokens else None
 
 
 def _split_list(value):

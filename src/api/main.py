@@ -32,6 +32,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..model.features import DAS_TYPES, load_corpus
+from ..parsing.antennas import OPERATORS, PRIVATE
 from ..model.predict import LABELS, MIN_STUDIES_PER_DAS, predict_all
 from ..model.train import MODEL_DIR, VERSION
 from .catalogue import FAMILIES, references_from_elr
@@ -57,7 +58,9 @@ DEFAULT_BANDS = [
     "700 MHz (4G)", "800 MHz (4G)", "900 MHz (2G)", "900 MHz (3G)",
     "1800 MHz (4G)", "2100 MHz (4G)", "2600 MHz (4G)", "3.5 GHz (5G)",
 ]
-DEFAULT_OPERATORS = ["BOUYGUES", "FREE", "ORANGE", "SFR"]
+# Liste fixe : les 4 opérateurs mobiles et « PRIVÉ » (réseau privé, sans opérateur).
+# Les noms lus dans les études (variantes, « OPERATEUR 1 »…) ne sont pas proposés.
+OPERATOR_CHOICES = OPERATORS + [PRIVATE]
 
 SessionLocal = make_session_factory(DB_URL)
 
@@ -116,14 +119,10 @@ def get_corpus_options():
                 found |= {v.strip() for v in cell.split(";") if v.strip()}
             return found
 
-        return values("bands"), values("operators_names")
+        return values("bands")
 
-    loaded = _cached("corpus", path, load)
-    bands, operators = loaded if loaded else (set(), set())
-    return (
-        sorted(bands | set(DEFAULT_BANDS), key=_band_order),
-        sorted(operators | set(DEFAULT_OPERATORS)),
-    )
+    bands = _cached("corpus", path, load) or set()
+    return sorted(bands | set(DEFAULT_BANDS), key=_band_order), OPERATOR_CHOICES
 
 
 def _model_info(bundle):
